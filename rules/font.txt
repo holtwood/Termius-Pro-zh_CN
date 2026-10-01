@@ -1,0 +1,24 @@
+# 自定义字体规则（-f/--font 时加载）
+# 在 Termius 字体候选列表与常量映射中注入：
+#   - CodeNewRoman Nerd Font Mono（英文等宽，Nerd Font 图标）
+#   - Resource Han Rounded CN（中文字体，思源圆体简体）
+# 说明：
+#   - 锚点均为字面量字符串，若官方新版本不再包含（如变量名变化），规则自动跳过，不影响其他功能
+#   - 默认终端字体修改（第 1-3 条）依赖压缩变量名（y7/defaultFontFamily$1/ySe，分别位于
+#     background-process / ui-process / main-process 三个 bundle），若新版本变量名变化则仅列表注入
+#     生效，可在设置中手动选择
+# 默认终端字体：Source Code Pro -> CodeNewRoman Nerd Font Mono（三个进程的默认值都要改）
+y7="Source Code Pro"|y7="CodeNewRoman Nerd Font Mono"
+defaultFontFamily$1="Source Code Pro"|defaultFontFamily$1="CodeNewRoman Nerd Font Mono"
+ySe="Source Code Pro"|ySe="CodeNewRoman Nerd Font Mono"
+# 字体候选列表追加两个字体
+"Fira Code","JetBrains Mono","Meslo"]|"Fira Code","JetBrains Mono","Meslo","CodeNewRoman Nerd Font Mono","Resource Han Rounded CN"]
+# 字体常量映射追加两个条目
+MESLO:"Meslo",COURIER_NEW:"Courier New"}|MESLO:"Meslo",CODE_NEW_ROMAN:"CodeNewRoman Nerd Font Mono",RESOURCE_HAN_ROUNDED:"Resource Han Rounded CN",COURIER_NEW:"Courier New"}
+# UI 全局字体：CodeNewRoman（英文）优先 + Resource Han Rounded CN（中文）回退，保留系统字体兜底
+# 锚点共 2 处（background 主题对象 / ui-process LIGHT_THEME），全部替换
+fontFamily:"system-ui, 'Helvetica Neue', Arial, sans-serif"|fontFamily:"'CodeNewRoman Nerd Font Mono','Resource Han Rounded CN',system-ui,'Helvetica Neue',Arial,sans-serif"
+# MUI 主题 typography（UI 字体主驱动，所有 MUI 组件继承）+ 组件 root 样式：CircularXX -> 新字体链
+fontFamily:"CircularXX, sans-serif"|fontFamily:"'CodeNewRoman Nerd Font Mono','Resource Han Rounded CN',sans-serif"
+# 快捷键提示等组件的 Lucida Grande 链（3 处）
+fontFamily:"Lucida Grande, CircularXX, sans-serif"|fontFamily:"'CodeNewRoman Nerd Font Mono','Resource Han Rounded CN',sans-serif"

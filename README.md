@@ -9,6 +9,7 @@
 
 - **一键汉化** - 自动化界面汉化
 - **试用功能激活** - 解锁高级特性
+- **自定义字体注入** - 内置 CodeNewRoman Nerd Font Mono（英文）+ Resource Han Rounded CN（中文）
 - **多平台支持** - Windows/macOS/Linux
 - **安全机制** - 自动备份
 
@@ -36,6 +37,9 @@ python lang.py
 # 汉化+试用+样式修改
 python lang.py --localize --trial --style
 
+# 汉化+自定义字体注入（CodeNewRoman Nerd Font Mono + Resource Han Rounded CN）
+python lang.py --localize --font
+
 # 仅激活试用功能
 python lang.py --trial
 
@@ -57,6 +61,7 @@ python lang.py --extract
 | `--trial`         | `-t` | 激活试用功能     | `python lang.py -lt`                |
 | `--skip-login`    | `-k` | 跳过登录验证     | `python lang.py -lk`                |
 | `--style`         | `-s` | 样式修改       | `python lang.py -ls`                |
+| `--font`          | -   | 注入自定义字体（默认终端字体改为 CodeNewRoman Nerd Font Mono，字体列表追加 CodeNewRoman + Resource Han Rounded CN） | `python lang.py -l --font` |
 | `--restore`       | `-r` | 还原操作       | `python lang.py -r`                 |
 | `--find <关键词...>` | `-f` | 多条件联合搜索    | `python lang.py -f "term1" "term2"` |
 | `--extract`       | `-e` | 提取所有可能的字符串 | `python lang.py -e`                 |
@@ -69,11 +74,26 @@ rules/
 ├── trial.txt       # 试用功能规则(-t/--trial时加载)
 ├── localize.txt    # 汉化规则(-l/--localize时加载)
 ├── skip_login.txt  # 登录跳过规则(-k/--skip-login时加载)
-└── style.txt       # 样式修改规则(-s/--style时加载)
+├── style.txt       # 样式修改规则(-s/--style时加载)
+└── font.txt        # 自定义字体规则(--font时加载)
+fonts/
+├── CodeNewRomanNerdFontMono-Regular.otf   # 英文字体（Nerd Font）
+├── CodeNewRomanNerdFontMono-Bold.otf
+├── CodeNewRomanNerdFontMono-Italic.otf
+├── ResourceHanRoundedCN-Regular.ttf       # 中文字体（思源圆体简体）
+└── fonts.css                               # @font-face 注入模板
 extract/
 ├── app.asar.unpack # 解包出的所有文件
 └── allstring.txt   # 所有可能的字符串
 ```
+
+### 🎨 自定义字体说明
+
+- 字体文件放在 `fonts/` 目录（.ttf/.otf/.woff2），`--font` 时会复制到 Termius 的 `ui-process/assets/` 内
+- `fonts/fonts.css` 是 `@font-face` 注入模板，可自行修改（字体名、字重、来源文件需与 `fonts/` 内文件名一致）
+- `rules/font.txt` 控制字体在 Termius 中的注册：默认终端字体、设置面板字体候选列表、字体常量映射
+- 注入是幂等的：重复执行不会重复追加
+- 字体均为开源 SIL OFL 协议，仅用于本地学习测试
 
 ## 🤷 手动汉化
 
@@ -89,8 +109,8 @@ extract/
 4. 如果你不想自动更新，请删除 `app-update.yml` 文件。
 5. 最后，如果没有想要的版本，可在 [Fork][fork] 本项目后前往仓库的 **Settings > Secrets and variables > Actions > Variables** 页面定义变量:
   - **Name**: `RELEASE_LIST`
-  - **Value**: `l,lk,lt`
-  - 默认`l,lk,lt`，代表生成三个版本，l为汉化，lt为汉化+试用，lk为汉化+跳过登录。可自行修改，通过逗号分隔。
+  - **Value**: `lf,lkf,ltf`
+  - 默认`lf,lkf,ltf`，代表生成三个版本，l为汉化，f为注入自定义字体，t为试用，k为跳过登录。可自行修改，通过逗号分隔（如去掉 `f` 可生成不含字体的版本）。
 
 ## 📱 关于安卓版
 

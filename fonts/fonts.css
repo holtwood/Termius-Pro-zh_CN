@@ -1,0 +1,8 @@
+/* ================= 自定义字体注入（lang.py --font 时追加到 ui-process/assets/main-*.css） ================= */
+/* 字体来源：fonts/ 目录下的字体文件会被复制到 ui-process/assets/，此处 url 使用相对路径 */
+/* CodeNewRoman Nerd Font Mono：英文字体，含 Regular/Bold/Italic */
+/* Resource Han Rounded CN：中文字体（思源圆体简体），仅 Regular */
+@font-face{font-family:"CodeNewRoman Nerd Font Mono";font-style:normal;font-weight:400;src:url(./CodeNewRomanNerdFontMono-Regular.otf)}
+@font-face{font-family:"CodeNewRoman Nerd Font Mono";font-style:normal;font-weight:700;src:url(./CodeNewRomanNerdFontMono-Bold.otf)}
+@font-face{font-family:"CodeNewRoman Nerd Font Mono";font-style:italic;font-weight:400;src:url(./CodeNewRomanNerdFontMono-Italic.otf)}
+@font-face{font-family:"Resource Han Rounded CN";font-style:normal;font-weight:400;src:url(./ResourceHanRoundedCN-Regular.ttf)}

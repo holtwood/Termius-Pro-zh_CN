@@ -124,20 +124,29 @@ jobs:
               "l") echo "localize" ;;
               "k") echo "skip" ;;
               "t") echo "trial" ;;
+              "f") echo "font" ;;
+            esac
+          }
+          get_arg() {
+            case "$1" in
+              "l") echo "-l" ;;
+              "k") echo "-k" ;;
+              "t") echo "-t" ;;
+              "f") echo "--font" ;;
             esac
           }
           prefix=$(get_platform_prefix "${{ inputs.platform }}")
-          RELEASE_LIST="${{ vars.RELEASE_LIST || 'l,lk,lt' }}"
+          RELEASE_LIST="${{ vars.RELEASE_LIST || 'lf,lkf,ltf' }}"
           IFS=',' read -ra releases <<< "$RELEASE_LIST"
           for release in "${releases[@]}"; do
             args="" features=""
             for ((i=0; i<${#release}; i++)); do
               char="${release:$i:1}"
-              feature=$(get_feature "$char")
-              [ -n "$feature" ] && { args+="$char"; features="${features:+$features-}$feature"; } || echo "::warning::Ignoring unknown argument: $char" >&2
+              arg=$(get_arg "$char")
+              [ -n "$arg" ] && { args="${args:+$args }$arg"; feature=$(get_feature "$char"); features="${features:+$features-}$feature"; } || echo "::warning::Ignoring unknown argument: $char" >&2
             done
-            file="${prefix}${args:+-$features}.asar"
-            python lang.py -"$args" && cp "${{ inputs.source_path }}" "$temp_dir/$file" || exit 1
+            file="${prefix}${features:+-$features}.asar"
+            python lang.py $args && cp "${{ inputs.source_path }}" "$temp_dir/$file" || exit 1
             echo "✓ $file"
           done
           ls -lah "$temp_dir"
