@@ -103,6 +103,8 @@
   <string name="alp_42447968_msg_release_finger_when_done">完成后松开手指</string>
   <string name="alp_42447968_msg_your_new_unlock_pattern">你的新解锁图案</string>
   <string name="already_have_an_account">已有账户？</string>
+  <string name="androidx_compose_foundation_autofill">自动填充</string>
+  <string name="androidx_compose_ui_autofill">自动填充</string>
   <string name="androidx_startup">androidx.startup</string>
   <string name="annual_introductory_offer_price">然后每年 %s（每月 %s）</string>
   <string name="app_lock_change_canceled">已取消</string>
@@ -130,7 +132,6 @@
   <string name="attached_to_title">已附加到</string>
   <string name="authenticate">认证</string>
   <string name="authy_token_hint">令牌</string>
-  <string name="autofill">自动填充</string>
   <string name="avo_env">PROD</string>
   <string name="aws_credentials_title">输入 AWS 凭证</string>
   <string name="aws_imported_many_hosts">%1$s 个 AWS 主机已导入并添加到“主机”</string>
@@ -1011,6 +1012,7 @@ Termius 不存储密码。如果你忘记了密码，你将丢失数据。这就
   <string name="instant_upload_nothing_to_upload_toast">分享内容中无可上传的文件</string>
   <string name="instant_upload_open_terminal_first_toast">请先打开终端连接</string>
   <string name="instant_upload_share_target_label">通过 Termius 上传</string>
+  <string name="instant_upload_target_was_disconnected_toast">目标会话已断开连接</string>
   <string name="instant_upload_toast_cancel_description">取消</string>
   <string name="instant_upload_toast_show_details">查看详情</string>
   <string name="instant_upload_toast_upload_failed">上传失败</string>
@@ -1149,6 +1151,15 @@ Termius 不存储密码。如果你忘记了密码，你将丢失数据。这就
   <string name="m3_adaptive_default_pane_expansion_end_offset_anchor_description">%d DPs 从末尾</string>
   <string name="m3_adaptive_default_pane_expansion_proportion_anchor_description">%d 百分比</string>
   <string name="m3_adaptive_default_pane_expansion_start_offset_anchor_description">%d DPs 从开头</string>
+  <string name="m3_adaptive_default_pane_title_primary">主窗格</string>
+  <string name="m3_adaptive_default_pane_title_secondary">次窗格</string>
+  <string name="m3_adaptive_default_pane_title_tertiary">第三窗格</string>
+  <string name="m3_adaptive_drag_to_resize_click_to_collapse_description">折叠</string>
+  <string name="m3_adaptive_drag_to_resize_click_to_expand_description">展开</string>
+  <string name="m3_adaptive_drag_to_resize_click_to_partially_expand_description">部分展开</string>
+  <string name="m3_adaptive_drag_to_resize_collapsed_state_description">已折叠</string>
+  <string name="m3_adaptive_drag_to_resize_expanded_state_description">已展开</string>
+  <string name="m3_adaptive_drag_to_resize_partially_expanded_state_description">部分展开</string>
   <string name="m3_exceed_max_badge_text_suffix">%1$s%2$s</string>
   <string name="m3_ref_typeface_brand_medium">sans-serif-medium</string>
   <string name="m3_ref_typeface_brand_regular">sans-serif</string>

@@ -1179,6 +1179,8 @@ children:"personal vault."|children:"个人保管库"
 name:"Personal"|name:"个人"
 title:"Team"|title:"团队"
 
+name:"Add to Workspace"|name:"添加到工作区"
+name:"New Workspace"|name:"新建工作区"
 "Create Workspace Template":"Update Workspace Template"|"创建工作区模板":"更新工作区模板"
 placeholder:"New Workspace"|placeholder:"新建工作区"
 "Workspace Template"|"工作区模板"
@@ -1261,7 +1263,7 @@ children:"Send a link to your teammates and troubleshoot issues together in the 
 "Secure Sync"|"安全同步"
 "Enable Multiplayer"|"启用多人模式"
 /children:\["Enable ",(\w+?)\("mark",{children:"Multiplayer"}\)," in Termius"\]/|children:["在 Termius 中启用",\g<1>("mark",{children:"多人模式"})]
-/children:\["Terminal ",(\w+?)\("mark",{children:"Multiplayer"}\)\]/|children:["终端",e("mark",{children:"多人模式"})]
+/children:\["Terminal ",(\w+?)\("mark",{children:"Multiplayer"}\)\]/|children:["终端",\g<1>("mark",{children:"多人模式"})]
 children:"Integrations"|children:"集成"
 /children:\["Share this ",([\w$]+?)\.type\]/|children:["共享此",\g<1>.type==="group"?"分组":\g<1>.type==="host"?"主机":\g<1>.type==="snippet"?"代码片段":\g<1>.type]
 "Securely share data via team vaults to boost your team's productivity."|"通过团队保管库安全地共享数据，以提高团队的生产力。"
@@ -1631,3 +1633,6 @@ children:"Contact support"|children:"联系支持"
 "you have an active internet connection"|"你的设备已连接到互联网"
 "your firewall allows internet access for the Termius app"|"防火墙允许 Termius 应用访问互联网"
 "your firewall allows HTTP requests to and responses from the api.termius.com server"|"防火墙允许向 api.termius.com 服务器发送 HTTP 请求并接收响应"
+children:"Update"|children:"更新"
+/children:\["The update will be available after",(\S+?),"the new version ",(\w+?)," is downloaded."\]/|children:["下载新版本 ",\g<2>," 后将提供更新。"]
+/children:\["Restart and update to version ",(\S+?),"Read the"," ",(\S+?)," ","for release notes"\]/|children:["重启并更新至版本 ",\g<1>,"阅读"," ",\g<2>," ","以获取发行说明"]

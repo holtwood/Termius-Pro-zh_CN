@@ -17,6 +17,37 @@ from tkinter import filedialog
 from logger import setup_logging
 
 
+# Electron v1 熔丝表（格式参考 @electron/fuses）：
+# [哨兵字符串][版本号 1 字节][熔丝数量 1 字节][状态字节 x N]
+# 状态字节 '1'/'0'/'r' 分别表示开启/关闭/移除
+FUSE_SENTINEL = b"dL7pKGdnNz796PbbjQWNKmHXBZaB9tsX"
+FUSE_ASAR_INTEGRITY = 4  # EnableEmbeddedAsarIntegrityValidation 在熔丝表中的序号
+FUSE_ON = 0x31           # '1'
+FUSE_OFF = 0x30          # '0'
+FUSE_REMOVED = 0x72      # 'r'
+
+# 字符串提取的过滤阈值
+MIN_STRING_LENGTH = 4        # 下界：短于此长度的多为压缩后的符号碎片
+MAX_STRING_LENGTH = 300      # 上界：更长的多为代码或数据块
+SPACE_REQUIRED_ABOVE = 20    # 超过此长度必须含空格，否则多为压缩后的标识符
+
+
+def scan_file_for_sentinel(file_path, chunk_size=1024 * 1024):
+    """流式扫描文件是否包含熔丝哨兵字符串"""
+    tail = b""
+    try:
+        with open(file_path, "rb") as file:
+            while True:
+                chunk = file.read(chunk_size)
+                if not chunk:
+                    return False
+                if FUSE_SENTINEL in tail + chunk:
+                    return True
+                tail = chunk[-(len(FUSE_SENTINEL) - 1):]
+    except OSError:
+        return False
+
+
 def is_macos():
     """检测是否为 macOS 系统"""
     return platform.system() == 'Darwin'
@@ -60,14 +91,38 @@ def read_file(file_path, strip_empty=True):
         raise RuntimeError(f"Read error: {file_path} - {e}") from e
 
 
-def write_file_atomic(file_path, content):
-    """原子写入文件：先写临时文件再替换，避免中断导致损坏"""
+def write_file_atomic(file_path, content=None, offsets=None):
+    """原子写入文件：先写临时文件再替换，避免中断导致损坏（支持文本和二进制内容）
+
+    Args:
+        file_path: 文件路径
+        content: 完整内容（bytes 走二进制，其他按 utf-8 文本写入），整体覆写时必填
+        offsets: 局部补丁 {偏移: 补丁}，提供时只在副本上改写补丁位置，
+                 避免为改几个字节而整块读写（如数百 MB 的可执行文件）
+    """
     file_dir = os.path.dirname(file_path) or "."
     temp_path = None
     try:
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=file_dir, delete=False) as temp_file:
-            temp_file.write(content)
-            temp_path = temp_file.name
+        if offsets:
+            fd, temp_path = tempfile.mkstemp(dir=file_dir)
+            os.close(fd)
+            shutil.copyfile(file_path, temp_path)
+            # mkstemp 默认 0600 且 copyfile 不带权限位，需还原，否则会丢掉可执行位
+            shutil.copymode(file_path, temp_path)
+            with open(temp_path, "r+b") as temp_file:
+                for offset, patch in sorted(offsets.items()):
+                    temp_file.seek(offset)
+                    temp_file.write(patch if isinstance(patch, (bytes, bytearray))
+                                    else patch.encode("utf-8"))
+        else:
+            if content is None:
+                raise ValueError("write_file_atomic: content is required when offsets is empty")
+            binary = isinstance(content, (bytes, bytearray))
+            mode = "wb" if binary else "w"
+            encoding = None if binary else "utf-8"
+            with tempfile.NamedTemporaryFile(mode, encoding=encoding, dir=file_dir, delete=False) as temp_file:
+                temp_file.write(content)
+                temp_path = temp_file.name
         if temp_path is not None:
             os.replace(temp_path, file_path)
     finally:
@@ -249,12 +304,11 @@ def get_termius_path(beta=False):
     }
     system = platform.system()
     path_generator = default_paths.get(system)
-
-    if path_generator:
-        termius_path = path_generator()
-    else:
+    if not path_generator:
         logging.error(f"Unsupported operating system: {system}")
         sys.exit(1)
+
+    termius_path = path_generator()
 
     # 验证路径有效性，无效则让用户手动选择
     if not check_asar_existence(termius_path):
@@ -307,6 +361,15 @@ class TermiusModifier:
         """自定义字体目录（--font 时使用）"""
         return os.path.join(self._script_dir, "fonts")
 
+    @property
+    def _executable_candidates(self):
+        """可执行文件候选路径（熔丝表保存在可执行文件内）"""
+        app_name = "Termius Beta" if self.args.beta else "Termius"
+        parent = os.path.dirname(self.termius_path)
+        if is_windows():
+            return [os.path.join(parent, f"{app_name}.exe")]
+        return [os.path.join(parent, app_name), os.path.join(parent, app_name.lower())]
+
     def __init__(self, termius_path, args):
         """初始化修改器实例"""
         self.termius_path = termius_path
@@ -348,6 +411,81 @@ class TermiusModifier:
         if os.path.exists(self._backup_path):
             os.remove(self._backup_path)
 
+    def _find_fuse_executable(self):
+        """定位包含熔丝表的可执行文件"""
+        for path in self._executable_candidates:
+            if os.path.isfile(path):
+                return path
+        # 已知名称未命中时，在安装目录一级文件中扫描哨兵字符串兜底
+        parent = os.path.dirname(self.termius_path)
+        try:
+            entries = os.listdir(parent)
+        except OSError:
+            return None
+        for name in entries:
+            path = os.path.join(parent, name)
+            if os.path.isfile(path) and os.path.getsize(path) <= 512 * 1024 * 1024 \
+                    and scan_file_for_sentinel(path):
+                return path
+        return None
+
+    def disable_asar_integrity_validation(self):
+        """关闭可执行文件中的 asar 完整性校验熔丝
+
+        新版 Termius 启用了 EnableEmbeddedAsarIntegrityValidation，替换 app.asar 后
+        启动会因校验失败而被阻止，需要将该熔丝置为关闭。
+        macOS 端由 osxfix.sh 更新 Info.plist 中的预期 hash，无需关闭熔丝，故跳过。
+        """
+        if is_macos():
+            return
+        exe_path = self._find_fuse_executable()
+        if not exe_path:
+            logging.warning("Termius executable not found, skip disabling asar integrity validation")
+            return
+        try:
+            with open(exe_path, "rb") as file:
+                content = file.read()
+        except OSError as e:
+            logging.warning(f"Cannot read executable {exe_path}: {e}")
+            return
+        index = content.find(FUSE_SENTINEL)
+        if index < 0:
+            logging.info("Fuse wire not found in executable, nothing to do")
+            return
+        wire_start = index + len(FUSE_SENTINEL)
+        version, fuse_count = content[wire_start], content[wire_start + 1]
+        if version != 1 or fuse_count <= FUSE_ASAR_INTEGRITY \
+                or len(content) < wire_start + 2 + fuse_count:
+            logging.warning(f"Unsupported fuse wire (version={version}, count={fuse_count}), skip")
+            return
+        offset = wire_start + 2 + FUSE_ASAR_INTEGRITY
+        state = content[offset]
+        if state == FUSE_OFF or state == FUSE_REMOVED:
+            logging.info("Asar integrity validation already disabled")
+            return
+        if state != FUSE_ON:
+            logging.warning(f"Unexpected fuse state {bytes([state])!r}, skip")
+            return
+        # 预检写权限：需同时可写可执行文件及其所在目录（临时文件建在目录内），
+        # Linux 安装目录属主通常为 root，提前给出准确提示而不是写入中途报 EACCES
+        if not (os.access(exe_path, os.W_OK) and os.access(os.path.dirname(exe_path), os.W_OK)):
+            logging.error(
+                f"No write permission for Termius executable: {exe_path}. "
+                "Disabling asar integrity validation requires elevated privileges "
+                "(run as administrator on Windows, or use sudo on Linux/macOS)."
+            )
+            sys.exit(1)
+        # 只改 1 字节，用局部补丁避免整块读写可执行文件
+        try:
+            write_file_atomic(exe_path, offsets={offset: bytes([FUSE_OFF])})
+        except OSError as e:
+            logging.error(
+                f"Failed to write executable: {e}. Make sure Termius is fully closed "
+                "and you have write access to the Termius directory."
+            )
+            sys.exit(1)
+        logging.info("Asar integrity validation disabled (EnableEmbeddedAsarIntegrityValidation)")
+
     def decompress_asar(self):
         """解压 app.asar 文件到 app 目录"""
         cmd = [get_asar_cmd(), "extract", self._original_path, self._app_dir]
@@ -382,14 +520,14 @@ class TermiusModifier:
     def extract_all_strings(self):
         """从 JS 和 JSON 文件中提取所有字符串到 allstring.txt
 
-        提取双引号、单引号和模板字符串，过滤短字符串和纯数字
+        提取双引号、单引号和模板字符串，过滤短碎片、首尾空白、换行/制表、超长串和纯数字
         """
         try:
             extract_dir = os.path.join(self._script_dir, "extract")
             os.makedirs(extract_dir, exist_ok=True)
             all_strings_file = os.path.join(extract_dir, "allstring.txt")
 
-            # 编译正则表达式（避免重复编译）
+            # 编译正则（避免每条字符串重复编译）
             patterns = [
                 re.compile(r'"([^"\\]*(?:\\.[^"\\]*)*)"'),
                 re.compile(r"'([^'\\]*(?:\\.[^'\\]*)*)'"),
@@ -412,15 +550,21 @@ class TermiusModifier:
                         with open(file_path, 'r', encoding='utf-8') as f:
                             content = f.read()
 
-                        # 提取三种类型的字符串
+                        # 提取单引号、双引号、模板字符串
                         for pattern in patterns:
                             all_strings.update(pattern.findall(content))
                     except Exception as e:
                         logging.debug(f"Cannot read file {file_path}: {e}")
 
-            # 过滤：长度>1、非空白、非纯数字，按长度和字母排序
+            # 过滤短碎片、首尾空白、换行/制表、超长串和纯数字；
+            # 超过 SPACE_REQUIRED_ABOVE 的无空格串多为压缩标识符
             filtered_strings = sorted(
-                [s for s in all_strings if len(s) > 1 and not s.isspace() and not number_pattern.match(s)],
+                [s for s in all_strings
+                 if MIN_STRING_LENGTH <= len(s) <= MAX_STRING_LENGTH
+                 and s == s.strip()
+                 and "\n" not in s and "\t" not in s and "\r" not in s
+                 and (len(s) <= SPACE_REQUIRED_ABOVE or " " in s)
+                 and not number_pattern.match(s)],
                 key=lambda x: (len(x), x.lower())
             )
 
@@ -463,11 +607,11 @@ class TermiusModifier:
                 logging.error(f"Failed to load rules from {file_name}: {e}")
                 sys.exit(1)
 
-        # 编译规则：区分注释、正则表达式和普通文本
+        # 编译规则：按文件原始顺序构建有序列表，保留规则间的前后依赖
+        # （短规则可能在完整正则之前出现，必须保持顺序，否则先应用会破坏正则所需原文）
         self.compiled_rules = []
         for line in self.loaded_rules:
             if is_comment_line(line):
-                self.compiled_rules.append(("comment", line, None, None))
                 continue
             try:
                 old_val, new_val = parse_replace_rule(line)
@@ -497,6 +641,7 @@ class TermiusModifier:
     def replace_content(self, file_content):
         """对单个文件内容执行所有规则的替换
 
+        按原始顺序逐条应用，命中才 replace/sub（plain 用 `in` 预检，regex 用 search 预检）。
         Returns:
             tuple: (新内容, 匹配的规则集合)
         """
@@ -506,17 +651,17 @@ class TermiusModifier:
             return file_content, set()
 
         matched_rules = set()
+
+        # 按原始顺序逐条应用：plain 用 `in` 预检、regex 用 search 预检，命中才替换
         for rule_type, line, old_or_pattern, new_val in self.compiled_rules:
-            if rule_type == "comment":
-                matched_rules.add(line)
-                continue
-            original_content = file_content
             if rule_type == "regex":
-                file_content = old_or_pattern.sub(new_val, file_content)
-            else:
-                file_content = file_content.replace(old_or_pattern, new_val)
-            if original_content != file_content:
-                matched_rules.add(line)
+                if old_or_pattern.search(file_content):
+                    matched_rules.add(line)
+                    file_content = old_or_pattern.sub(new_val, file_content)
+            else:  # plain
+                if old_or_pattern in file_content:
+                    matched_rules.add(line)
+                    file_content = file_content.replace(old_or_pattern, new_val)
 
         return file_content, matched_rules
 
@@ -531,7 +676,7 @@ class TermiusModifier:
                 content = read_file(file_path, strip_empty=False)
                 new_content, matched_rules = self.replace_content(content)
                 self.applied_rules.update(matched_rules)
-                if new_content != content:
+                if matched_rules:
                     write_file_atomic(file_path, new_content)
             except Exception as e:
                 logging.error(f"Failed to process file {file_path}: {e}")
@@ -607,6 +752,7 @@ class TermiusModifier:
         """
         start_time = time.monotonic()
         self.manage_workspace()
+        self.disable_asar_integrity_validation()
         self.decompress_asar()
         self.load_rules()
         if self.args.font:
@@ -618,9 +764,10 @@ class TermiusModifier:
         elapsed = time.monotonic() - start_time
         logging.info(f"Changes applied in {elapsed:.2f}s")
 
-        # 统计规则匹配情况
-        logging.info(f"Rules applied: {len(self.applied_rules)}/{len(self.loaded_rules)}")
-        unmatched_rules = list(filter(lambda x: x not in self.applied_rules, self.loaded_rules))
+        # 统计规则匹配情况（仅统计 compiled_rules 有效规则，排除注释行）
+        total_rule_lines = [line for _, line, _, _ in self.compiled_rules]
+        logging.info(f"Rules applied: {len(self.applied_rules)}/{len(total_rule_lines)}")
+        unmatched_rules = [line for line in total_rule_lines if line not in self.applied_rules]
         if unmatched_rules:
             if len(unmatched_rules) > 3:
                 logging.warning(f"{len(unmatched_rules)} rules did not match. See debug log for details.")
