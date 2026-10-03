@@ -1,0 +1,110 @@
+name: Release Font Platforms
+
+on:
+  schedule:
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+    inputs:
+      force_release:
+        description: 'Force release even if version not newer'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu
+            run_on: ubuntu-latest
+            version_command: |
+              set -e
+              wget --no-verbose -O Termius.deb https://autoupdate.termius.com/linux/Termius.deb || { echo "::error::Failed to download Termius.deb"; exit 1; }
+              termius_version=$(dpkg -I Termius.deb | grep -i 'Version:' | awk '{print $2}')
+              if [ -z "$termius_version" ]; then
+                termius_version=$(ar p Termius.deb control.tar.gz | tar -xzO ./control | grep -i 'Version:' | awk '{print $2}')
+              fi
+              echo "TERMIUS_VERSION=$termius_version" >> $GITHUB_ENV
+            install_command: |
+              set -e
+              sudo apt-get update
+              sudo apt-get install -y libnotify4 libsecret-1-0 python3-tk
+              sudo dpkg -i Termius.deb || { echo "::error::Failed to install Termius"; exit 1; }
+              sudo chmod -R 755 /opt/Termius
+              sudo chown -R $USER:$USER /opt/Termius
+            source_path: "/opt/Termius/resources/app.asar"
+          - platform: macos
+            run_on: macos-latest
+            version_command: |
+              set -e
+              echo "Downloading Termius..."
+              curl -L -o Termius.dmg https://autoupdate.termius.com/mac-universal/Termius.dmg || { echo "::error::Failed to download Termius.dmg"; exit 1; }
+              temp_mount_point=$(mktemp -d)
+              trap "hdiutil detach '$temp_mount_point' -quiet 2>/dev/null; rm -rf '$temp_mount_point'" EXIT
+              hdiutil attach Termius.dmg -mountpoint "$temp_mount_point" -quiet -nobrowse || { echo "::error::Failed to mount Termius.dmg"; exit 1; }
+              info_plist_path="$temp_mount_point/Termius.app/Contents/Info.plist"
+              [[ -f "$info_plist_path" ]] || { echo "::error::Info.plist not found"; exit 1; }
+              termius_version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$info_plist_path") || { echo "::error::Failed to read version"; exit 1; }
+              [[ -n "$termius_version" ]] || { echo "::error::Version is empty"; exit 1; }
+              echo "TERMIUS_VERSION=$termius_version" >> $GITHUB_ENV
+              echo "✓ Version: $termius_version"
+            install_command: |
+              set -e
+              echo "Installing Termius..."
+              temp_mount_point=$(mktemp -d)
+              trap "hdiutil detach '$temp_mount_point' -quiet 2>/dev/null; rm -rf '$temp_mount_point' Termius.dmg" EXIT
+              hdiutil attach Termius.dmg -mountpoint "$temp_mount_point" -quiet -nobrowse || { echo "::error::Failed to mount Termius.dmg"; exit 1; }
+              termius_app_path=$(find "$temp_mount_point" -name "Termius.app" -type d -maxdepth 3)
+              [[ -n "$termius_app_path" ]] || { echo "::error::Termius.app not found"; exit 1; }
+              cp -R "$termius_app_path" /Applications/ || { echo "::error::Failed to install Termius.app"; exit 1; }
+              sudo chmod -R 755 /Applications/Termius.app/Contents/Resources
+              echo "✓ Installed successfully"
+            source_path: "/Applications/Termius.app/Contents/Resources/app.asar"
+          - platform: windows
+            run_on: windows-latest
+            version_command: |
+              $ErrorActionPreference = 'Stop'
+              $url = "https://autoupdate.termius.com/windows/Install%20Termius.exe"
+              $installer_path = "$env:TEMP\Termius.exe"
+              try {
+                Write-Host "Downloading Termius installer..."
+                Invoke-WebRequest -Uri $url -OutFile $installer_path -UseBasicParsing
+                $termius_version = (Get-Item $installer_path).VersionInfo.ProductVersion
+                if (-not $termius_version) {
+                  throw "Failed to extract version from installer"
+                }
+                Add-Content -Path $env:GITHUB_ENV -Value "TERMIUS_VERSION=$termius_version"
+                Write-Host "✓ Version: $termius_version"
+              } catch {
+                Write-Host "::error::$_"
+                exit 1
+              }
+            install_command: |
+              $ErrorActionPreference = 'Stop'
+              $installer_path = "$env:TEMP\Termius.exe"
+              $install_dir = "$env:LOCALAPPDATA\Programs\Termius"
+              try {
+                Write-Host "Installing Termius..."
+                Start-Process -FilePath $installer_path -ArgumentList "/S" -Wait -NoNewWindow
+                if (-not (Test-Path $install_dir)) {
+                  throw "Installation failed, directory not found: $install_dir"
+                }
+                Write-Host "✓ Installed successfully"
+              } catch {
+                Write-Host "::error::$_"
+                exit 1
+              } finally {
+                Remove-Item -Path $installer_path -Force -ErrorAction SilentlyContinue
+              }
+            source_path: "$LOCALAPPDATA/Programs/Termius/resources/app.asar"
+    uses: ./.github/workflows/shared-steps-font.yml
+    name: "Release Font - ${{ matrix.platform }}"
+    with:
+      run_on: ${{ matrix.run_on }}
+      platform: ${{ matrix.platform }}
+      version_command: ${{ matrix.version_command }}
+      install_command: ${{ matrix.install_command }}
+      source_path: ${{ matrix.source_path }}
+      force_release: ${{ github.event.inputs.force_release == 'true' }}

@@ -1,4 +1,4 @@
-name: Shared Workflow Steps
+name: Shared Workflow Steps for Font Release
 
 on:
   workflow_call:
@@ -103,7 +103,7 @@ jobs:
         run: |
           set -e
           npm install -g @electron/asar || { echo "::error::Failed to install asar"; exit 1; }
-      - name: Generate localization assets
+      - name: Generate localization + font assets
         if: steps.compare_versions.outputs.should_continue == 'true'
         shell: bash
         run: |
@@ -136,8 +136,10 @@ jobs:
               feature=$(get_feature "$char")
               [ -n "$feature" ] && { args+="$char"; features="${features:+$features-}$feature"; } || echo "::warning::Ignoring unknown argument: $char" >&2
             done
-            file="${prefix}${args:+-$features}.asar"
-            python lang.py -"$args" && cp "${{ inputs.source_path }}" "$temp_dir/$file" || exit 1
+            # fontlang.py 在 fonts/ 目录存在时自动注入字体，无需额外参数；文件名追加 -font 标识
+            features="${features:+$features-}font"
+            file="${prefix}-${features}.asar"
+            python fontlang.py -"$args" && cp "${{ inputs.source_path }}" "$temp_dir/$file" || exit 1
             echo "✓ $file"
           done
           ls -lah "$temp_dir"
@@ -148,8 +150,8 @@ jobs:
         run: |
           set -e
           echo "Preparing release notes..."
-          [[ -f ./RELEASE_NOTES.md ]] || { echo "::error::RELEASE_NOTES.md not found"; exit 1; }
-          updated_notes=$(sed "s/{{VERSION}}/v$TERMIUS_VERSION/g" ./RELEASE_NOTES.md)
+          [[ -f ./RELEASE_NOTES_FONT.md ]] || { echo "::error::RELEASE_NOTES_FONT.md not found"; exit 1; }
+          updated_notes=$(sed "s/{{VERSION}}/v$TERMIUS_VERSION/g" ./RELEASE_NOTES_FONT.md)
           {
             echo "updated_release_notes<<EOF"
             echo "$updated_notes"

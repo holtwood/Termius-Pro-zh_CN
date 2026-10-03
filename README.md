@@ -38,7 +38,8 @@ python lang.py
 python lang.py --localize --trial --style
 
 # 汉化+自定义字体注入（CodeNewRoman Nerd Font Mono + Resource Han Rounded CN）
-python lang.py --localize --font
+# 字体功能由 fontlang.py 提供：fonts/ 目录存在即自动注入，无需额外参数
+python fontlang.py --localize
 
 # 仅激活试用功能
 python lang.py --trial
@@ -61,11 +62,12 @@ python lang.py --extract
 | `--trial`         | `-t` | 激活试用功能     | `python lang.py -lt`                |
 | `--skip-login`    | `-k` | 跳过登录验证     | `python lang.py -lk`                |
 | `--style`         | `-s` | 样式修改       | `python lang.py -ls`                |
-| `--font`          | -   | 注入自定义字体（默认终端字体改为 CodeNewRoman Nerd Font Mono，字体列表追加 CodeNewRoman + Resource Han Rounded CN） | `python lang.py -l --font` |
 | `--restore`       | `-r` | 还原操作       | `python lang.py -r`                 |
 | `--find <关键词...>` | `-f` | 多条件联合搜索    | `python lang.py -f "term1" "term2"` |
 | `--extract`       | `-e` | 提取所有可能的字符串 | `python lang.py -e`                 |
 | `--verbose`       | `-v` | 设置日志级别     | `python lang.py -v DEBUG`           |
+
+> **自定义字体**：`fontlang.py` 用法与 `lang.py` 完全一致，运行时若存在 `fonts/` 目录则自动注入字体（默认终端字体改为 CodeNewRoman Nerd Font Mono，字体列表追加 CodeNewRoman + Resource Han Rounded CN）；不需要字体的构建直接使用 `lang.py`。
 
 ## 📂 相关文件结构
 
@@ -75,7 +77,7 @@ rules/
 ├── localize.txt    # 汉化规则(-l/--localize时加载)
 ├── skip_login.txt  # 登录跳过规则(-k/--skip-login时加载)
 ├── style.txt       # 样式修改规则(-s/--style时加载)
-└── font.txt        # 自定义字体规则(--font时加载)
+└── font.txt        # 自定义字体规则(fontlang.py 自动加载)
 fonts/
 ├── CodeNewRomanNerdFontMono-Regular.otf   # 英文字体（Nerd Font）
 ├── CodeNewRomanNerdFontMono-Bold.otf
@@ -89,7 +91,7 @@ extract/
 
 ### 🎨 自定义字体说明
 
-- 字体文件放在 `fonts/` 目录（.ttf/.otf/.woff2），`--font` 时会复制到 Termius 的 `ui-process/assets/` 内
+- 字体文件放在 `fonts/` 目录（.ttf/.otf/.woff2），运行 `fontlang.py` 时自动复制到 Termius 的 `ui-process/assets/` 内
 - `fonts/fonts.css` 是 `@font-face` 注入模板，可自行修改（字体名、字重、来源文件需与 `fonts/` 内文件名一致）
 - `rules/font.txt` 控制字体在 Termius 中的注册：默认终端字体、设置面板字体候选列表、字体常量映射
 - 注入是幂等的：重复执行不会重复追加
@@ -113,8 +115,9 @@ extract/
 4. 如果你不想自动更新，请删除 `app-update.yml` 文件。
 5. 最后，如果没有想要的版本，可在 [Fork][fork] 本项目后前往仓库的 **Settings > Secrets and variables > Actions > Variables** 页面定义变量:
   - **Name**: `RELEASE_LIST`
-  - **Value**: `lf,lkf,ltf`
-  - 默认`lf,lkf,ltf`，代表生成三个版本，l为汉化，f为注入自定义字体，t为试用，k为跳过登录。可自行修改，通过逗号分隔（如去掉 `f` 可生成不含字体的版本）。
+  - **Value**: `l,lk,lt`
+  - 默认`l,lk,lt`，代表生成三个版本，l为汉化，t为试用，k为跳过登录；字体由 `fontlang.py` 自动注入，发布文件名以 `-font` 结尾。可自行修改，通过逗号分隔。
+  - **注意**：本仓库的字体版发布由 `release-font.yml` 每日定时构建；若启用了上游的 `Release Platforms` / `Release Beta Platforms` workflow，它们会构建不含字体的版本并占用相同版本号，请在仓库的 **Actions** 页面将其禁用，只保留 `Release Font Platforms`。
 
 ## 📱 关于安卓版
 

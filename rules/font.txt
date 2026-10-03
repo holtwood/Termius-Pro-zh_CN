@@ -1,4 +1,4 @@
-# 自定义字体规则（-f/--font 时加载）
+# 自定义字体规则（fontlang.py 运行时自动加载，fonts/ 目录存在即生效）
 # 在 Termius 字体候选列表与常量映射中注入：
 #   - CodeNewRoman Nerd Font Mono（英文等宽，Nerd Font 图标）
 #   - Resource Han Rounded CN（中文字体，思源圆体简体）

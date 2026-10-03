@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import argparse
 import fnmatch
-import glob
 import logging
 import os
 import platform
@@ -357,11 +356,6 @@ class TermiusModifier:
         return os.path.join(self._script_dir, "rules")
 
     @property
-    def _fonts_dir(self):
-        """自定义字体目录（--font 时使用）"""
-        return os.path.join(self._script_dir, "fonts")
-
-    @property
     def _executable_candidates(self):
         """可执行文件候选路径（熔丝表保存在可执行文件内）"""
         app_name = "Termius Beta" if self.args.beta else "Termius"
@@ -593,7 +587,7 @@ class TermiusModifier:
         支持的规则类型：skip_login, trial, style, localize
         规则格式：原字符串|新字符串 或 /正则表达式/|替换内容
         """
-        rule_args = ["skip_login", "trial", "style", "localize", "font"]
+        rule_args = ["skip_login", "trial", "style", "localize"]
 
         for arg in rule_args:
             if not getattr(self.args, arg, False):
@@ -693,70 +687,16 @@ class TermiusModifier:
         run_command(cmd)
         logging.info("macOS fix applied successfully")
 
-    def apply_fonts(self):
-        """注入自定义字体：复制字体文件到 ui-process/assets 并在主 CSS 追加 @font-face
-
-        字体文件来自脚本同级 fonts/ 目录，@font-face 模板来自 fonts/fonts.css。
-        幂等：CSS 中已含注入标记时自动跳过。
-        """
-        if not os.path.isdir(self._fonts_dir):
-            logging.warning("fonts directory not found, skipping font injection")
-            return
-
-        assets_dir = os.path.join(self._app_dir, "ui-process", "assets")
-        if not os.path.isdir(assets_dir):
-            logging.warning(f"ui-process/assets not found: {assets_dir}, skipping font injection")
-            return
-
-        # 1. 复制字体文件到 ui-process/assets（与官方内嵌 Nerd Font 同目录）
-        copied = 0
-        for fname in os.listdir(self._fonts_dir):
-            if not fname.lower().endswith((".ttf", ".otf", ".woff2")):
-                continue
-            src = os.path.join(self._fonts_dir, fname)
-            dst = os.path.join(assets_dir, fname)
-            shutil.copy2(src, dst)
-            logging.info(f"Copied font: {fname}")
-            copied += 1
-        logging.info(f"Font files copied: {copied}")
-
-        # 2. 在主 CSS 追加 @font-face（main-*.css，含 xterm 样式特征）
-        css_template = os.path.join(self._fonts_dir, "fonts.css")
-        if not os.path.isfile(css_template):
-            logging.warning("fonts.css template not found, skipping @font-face injection")
-            return
-        with open(css_template, "r", encoding="utf-8") as f:
-            font_faces = f.read()
-
-        injected = 0
-        for css_file in glob.glob(os.path.join(assets_dir, "main-*.css")):
-            content = read_file(css_file, strip_empty=False)
-            if "CodeNewRoman Nerd Font Mono" in content:
-                logging.info(f"Fonts already injected in {os.path.basename(css_file)}, skipped")
-                continue
-            if ".xterm-viewport" not in content:
-                logging.debug(f"Skipping non-terminal CSS: {os.path.basename(css_file)}")
-                continue
-            write_file_atomic(css_file, content + "\n" + font_faces)
-            logging.info(f"Injected @font-face into {os.path.basename(css_file)}")
-            injected += 1
-        if injected == 0:
-            logging.warning("No suitable main-*.css found for @font-face injection")
-        else:
-            logging.info(f"@font-face injected into {injected} CSS file(s)")
-
     def apply_changes(self):
         """执行完整的修改流程：解压->加载规则->替换->打包
 
-        支持的修改类型：localize, trial, skip_login, style, font
+        支持的修改类型：localize, trial, skip_login, style
         """
         start_time = time.monotonic()
         self.manage_workspace()
         self.disable_asar_integrity_validation()
         self.decompress_asar()
         self.load_rules()
-        if self.args.font:
-            self.apply_fonts()
         self.replace_rules()
         self.pack_to_asar()
         if is_macos():
@@ -834,9 +774,6 @@ def main():
     parser.add_argument("-t", "--trial", action="store_true", help="Activate professional edition trial.")
     parser.add_argument("-k", "--skip-login", action="store_true", help="Disable authentication workflow.")
     parser.add_argument("-s", "--style", action="store_true", help="UI/UX customization preset.")
-    parser.add_argument("--font", action="store_true",
-                        help="Inject custom fonts (fonts/ directory: font files + fonts.css template, "
-                             "see rules/font.txt for font list injection).")
     parser.add_argument("-e", "--extract", action="store_true", help="Unpack and extract application strings.")
     parser.add_argument("-f", "--find", nargs="+", help="Multi-mode search operation.")
     parser.add_argument("-r", "--restore", action="store_true", help="Restore software to initial state.")
@@ -850,8 +787,7 @@ def main():
     setup_logging(args.log_level)
 
     # 无参数时默认执行汉化
-    if not any((args.trial, args.find, args.style, args.skip_login, args.localize, args.font,
-                args.restore, args.extract)):
+    if not any((args.trial, args.find, args.style, args.skip_login, args.localize, args.restore, args.extract)):
         args.localize = True
         logging.info("No arguments provided, defaulting to localization mode")
 
@@ -860,7 +796,7 @@ def main():
     modifier = TermiusModifier(termius_path, args)
 
     # 根据参数执行对应操作
-    if any((args.trial, args.style, args.skip_login, args.localize, args.font)):
+    if any((args.trial, args.style, args.skip_login, args.localize)):
         modifier.apply_changes()
     elif args.find:
         modifier.find_in_content()
