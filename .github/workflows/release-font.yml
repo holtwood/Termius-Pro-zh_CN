@@ -11,6 +11,10 @@ on:
         type: boolean
         default: false
 
+# 发布 Release 需要 GITHUB_TOKEN 具备写权限（新仓库默认只读，必须显式声明）
+permissions:
+  contents: write
+
 jobs:
   release:
     strategy:
