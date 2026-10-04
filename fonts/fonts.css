@@ -1,4 +1,4 @@
-/* ================= 自定义字体注入（lang.py --font 时追加到 ui-process/assets/main-*.css） ================= */
+/* ================= 自定义字体注入（fontlang.py 运行时追加到 ui-process/assets/main-*.css） ================= */
 /* 字体来源：fonts/ 目录下的字体文件会被复制到 ui-process/assets/，此处 url 使用相对路径 */
 /* CodeNewRoman Nerd Font Mono：英文字体，含 Regular/Bold/Italic */
 /* Resource Han Rounded CN：中文字体（思源圆体简体），仅 Regular */
