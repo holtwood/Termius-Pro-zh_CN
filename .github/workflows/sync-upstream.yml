@@ -1,0 +1,48 @@
+name: Sync Upstream
+
+# 每日 00:00 UTC 自动合并上游 ArcSurge/Termius-Pro-zh_CN 的 main 分支。
+# 早于 release-font.yml（00:30 UTC）运行，当天构建即包含上游最新改动。
+# 本仓库所有上游文件保持原版（定制全部在独立新文件中），合并理论上零冲突；
+# 若上游大幅改写 README 等少数文件导致冲突，本 workflow 会直接失败（红色）提醒
+# 手动处理，绝不会带着冲突强行推送。不需要时在 Actions 页面禁用即可。
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge upstream main
+        run: |
+          set -e
+          git remote add upstream https://github.com/ArcSurge/Termius-Pro-zh_CN.git
+          git fetch upstream main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "✓ Already up to date with upstream/main"
+            exit 0
+          fi
+
+          echo "⇣ New upstream commits found, merging..."
+          git merge upstream/main --no-edit
+          git push origin main
+          echo "✓ Pushed merge commit to origin/main"
