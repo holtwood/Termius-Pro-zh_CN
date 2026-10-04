@@ -115,8 +115,8 @@ extract/
 4. 如果你不想自动更新，请删除 `app-update.yml` 文件。
 5. 最后，如果没有想要的版本，可在 [Fork][fork] 本项目后前往仓库的 **Settings > Secrets and variables > Actions > Variables** 页面定义变量:
   - **Name**: `RELEASE_LIST`
-  - **Value**: `l,lk,lt`
-  - 默认`l,lk,lt`，代表生成三个版本，l为汉化，t为试用，k为跳过登录；字体由 `fontlang.py` 自动注入，发布文件名以 `-font` 结尾。可自行修改，通过逗号分隔。
+  - **Value**: `l`
+  - 默认只发布 `app-*-localize-font.asar`（汉化+自定义字体）；如需其他变体可将值改为 `lt`（加试用）、`lk`（加跳过登录）或多组逗号分隔如 `l,lk,lt`（l=汉化，t=试用，k=跳过登录，所有产物均自动带字体）。
   - **注意**：本仓库的字体版发布由 `release-font.yml` 每日定时构建；若启用了上游的 `Release Platforms` / `Release Beta Platforms` workflow，它们会构建不含字体的版本并占用相同版本号，请在仓库的 **Actions** 页面将其禁用，只保留 `Release Font Platforms`。
 
 ## 📱 关于安卓版
